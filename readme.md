@@ -23,3 +23,17 @@ The idea here is that SuggestPlaces represents a situation that requires some ba
 This is one way you could implement an AI Chat Streaming API that allows for long running processes to be completed in the background, and also allowing you to start streaming a response to the client before the background process has been completed.
 
 There is still a little more work that I would like to do in this example, i.e. like actually calling the function (just haven had time to write that logic yet, but it's be easy)
+
+## Example Prompts to play with
+### hello, my name is rick and I would your help planning a day trip to Ashville, NC.
+This prompt will start an interaction with the API and if set break points you will see that this does not result in the **SuggestPlaces** function being identifying by the LLM that it needs to be involved.
+
+### Can you suggest some points of interests for Ashville, NC?  I am interested in biking and hiking and I will be traveling alone.
+Now, this prompt does meet the critira for the LLM to detect that the **SuggestPlaces** function needs to be called.  If you set a breakpoint on line 92 in ChatStreamerController.cs you will see that this line is hit, indicating that the function needs to be called.  
+
+Since the code does not have logic to call the **SuggestPlaces** there is nothing to stream back to the client so you don't get a response.  This is 100% expected with the implementation has I have not added the code for the function calling, but it would look something like this but done in a streaming way.
+
+    ~~~
+      functionToCall.InvokeAsync(kernel);
+    ~~~
+
