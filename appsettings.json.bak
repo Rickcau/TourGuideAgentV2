@@ -1,0 +1,27 @@
+
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+
+  "AllowedHosts": "*",
+
+  "AzureOpenAI": {
+    "ApiKey": "<your-api-key>",
+    "Endpoint": "<your-endpoint>",
+    "DeploymentId": "<your-deployment-id>"
+  },
+
+  "LocalSearch":{
+    "Endpoint": "",
+    "ApiKey": ""
+  },
+
+  "ConnectionStrings": {
+    "PostgreSQL": "<your-connection-string>",
+    "SQLite": "DataSource=your.db"
+  }
+}
