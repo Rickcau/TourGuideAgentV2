@@ -101,12 +101,6 @@ public class ChatStreamController : ControllerBase
                                     // The JobID approach something can be consider for longer running tasks.  But, for this example we are streaming the whole response back to the client, which may not be the best approach for large data sets.
                                     KernelFunction suggestPlacesFunction = _kernel.Plugins.GetFunction("TripPlannerPlugin", "SuggestPlaces");
                                     KernelArguments suggestPlacesArgs = functionCall.Arguments!;
-                                    KernelArguments args = new() {
-                                        { "clientId", _clientId },
-                                        { "location", "Ashville, NC" },
-                                        { "categories", "Hiking and Biking" },
-                                        { "travelCompanions", "alone" },
-                                    };
                                     FunctionResult result = await _kernel.InvokeAsync(suggestPlacesFunction, suggestPlacesArgs);
                                     IAsyncEnumerable<string> datastream = result.GetValue<IAsyncEnumerable<string>>()!;
                                     await foreach (var content in datastream)
