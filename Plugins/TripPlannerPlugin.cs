@@ -24,59 +24,40 @@ namespace TourGuideAgentV2.Plugins.TripPlanner
             _kernel = kernel.Clone();  // Let's clone the kernel so we have a fresh copy to work with with zero plugins registered
         }
 
-        // [Microsoft.SemanticKernel.KernelFunction, Description("Generate an road trip itinerary")]
-        // public async Task<string> SuggestRoadtrip(
-        //     [Description("Source city"), Required] string source,
-        //     [Description("Destination city"), Required] string destination,
-        //     [Description("User preffered categories"), Required] string categories,
-        //     [Description("Travel companions if user traveling alone, with family, or with a group?"), Required] string travelCompanions
-        // )
-        // {
-        //     var executionSettings = new OpenAIPromptExecutionSettings
-        //     {
-        //         ResponseFormat = "json_object"
-        //     };
-
-        //     // Keep the ChatHistory local since we only need it to detect the Intent
-        //     ChatHistory chatHistory = new ChatHistory();
-        //     chatHistory.AddSystemMessage(TravelPluginPrompts.GetRoadtripPrompt(source, destination, categories, travelCompanions));
-            
-        //     var result = await this._chatService.GetChatMessageContentAsync(chatHistory, executionSettings);
-            
-        //     return result.ToString();
-        // }
-        
         [Microsoft.SemanticKernel.KernelFunction, Description("Suggest points of interests and highlights in given location")]
-        public async IAsyncEnumerable<string> SuggestPlaces(
+        public async IAsyncEnumerable<string> SuggestPlacesAsync(
+            [Description("ClientId"), Required] string clientId,
             [Description("Location"), Required] string location,
             [Description("User prefered categories"), Required] string categories,
-            [Description("Travel companions if user traveling alone, with family, or with a group?"), Required] string travelCompanions
-        )
+            [Description("Travel companions if user traveling alone, with family, or with a group?"), Required] string travelCompanions)
         {
             var executionSettings = new OpenAIPromptExecutionSettings
             {
                 ResponseFormat = "json_object"
             };
-
-            // Keep the ChatHistory local since we only need it to detect the Intent
-            ChatHistory localChatHistory = new ChatHistory();
-            localChatHistory.AddSystemMessage(TripPlannerPluginPrompts.GetPlacesPrompt(location,categories,travelCompanions));
+            var chatHistory = _chatHistoryManager.GetOrCreateChatHistory(clientId);
+            chatHistory.AddSystemMessage(TripPlannerPluginPrompts.GetPlacesPrompt(location,categories,travelCompanions));
+            chatHistory.AddUserMessage("Suggest places");
 
             var assistantResponse = "";
-            await foreach (var chatUpdate in _chatService.GetStreamingChatMessageContentsAsync(localChatHistory, executionSettings,_kernel))
+            await foreach (var chatUpdate in _chatService.GetStreamingChatMessageContentsAsync(chatHistory, executionSettings,_kernel))
             {      
                    assistantResponse += chatUpdate.ToString();          
                    yield return chatUpdate.ToString();
             }
-            localChatHistory.AddSystemMessage(assistantResponse); // Not really needed at this point but might need it later, logic is not finished here.
-
+            chatHistory.AddSystemMessage(assistantResponse); 
+            
+            // !!!!!!!! This is where the background task should be started !!!!!!!!!
+            // But, I am just not sure it's need as this data comes back farily quickly, just it's JSON data but the client could be designed to handle that.
+            // Also read my comments about this in the ChatStreamerController.cs file
             // Start the background task to process the trip and add the result to the cache
             // you would then need to expose an API to retrieve the results from the cache, the client would call this 
-            var jobId = Guid.NewGuid().ToString();  // generate the JobId
-            yield return $" JobId: {jobId}"; // return the JobId to the client
-            var result = StartBackgroundTripProcessing(jobId, location, categories, travelCompanions);
-        } 
-
+            // var jobId = Guid.NewGuid().ToString();  // generate the JobId
+            // yield return $" JobId: {jobId}"; // return the JobId to the client
+            // var result = StartBackgroundTripProcessing(jobId, location, categories, travelCompanions);
+        }
+        
+    
         public string StartBackgroundTripProcessing(string jobId, string location, string categories, string travelCompanions)
         {
             // Start the background task

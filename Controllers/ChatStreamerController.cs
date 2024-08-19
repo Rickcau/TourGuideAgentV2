@@ -65,9 +65,11 @@ public class ChatStreamController : ControllerBase
                 chatHistory.AddUserMessage($"ClientId: {_clientId}, VehicleId: {_vehicleId}");
 
                 _kernel.ImportPluginFromObject(new TripPlannerPlugin(_chat, _chatHistoryManager, _jobResultsCacheService, _kernel), "TripPlannerPlugin");
+
                 var orchestratorLogger = _loggerFactory.CreateLogger<OrchestratorPlugin>();
                 OrchestratorPlugin masterOrchestrator = new OrchestratorPlugin(_kernel, _chatHistoryManager, orchestratorLogger);
-
+                
+                // Main mesage loop for the OrchestratorPlugin
                 await foreach (var chunk in masterOrchestrator.MessageLoopStreamAsync(request.Prompt, _clientId, _vehicleId!))
                 {
                     if (chunk == null)
@@ -77,21 +79,44 @@ public class ChatStreamController : ControllerBase
                     await WriteChunk(writer, chunk!.ToString());
                     //await Task.Delay(200);
                 }
-
+                
+                // Let's check to see if we have any function calls.
+                // We have to detect the function calls that need to be executed and use this special approach to stream the response back to the client. 
                 if (masterOrchestrator.FunctionsToCall)
                 {
-                   _logger.LogInformation($"Function calls to be executed:{ masterOrchestrator.FunctionsToCall}");
-                   var functionCalls = masterOrchestrator.GetFunctionsToCall();
+                    _logger.LogInformation($"Function calls to be executed:True");
+                    var functionCalls = masterOrchestrator.GetFunctionsToCall();
                     if (functionCalls != null && functionCalls.Any())
                     {
-
-                        foreach (var func in functionCalls)
+                        var functionCall = functionCalls.First(); 
+                        switch (functionCall.PluginName)
                         {
-                            if (func != null)
-                            {
-                                Console.WriteLine($"Plugin: {func.PluginName}, Function: {func.FunctionName}, Arguments: {func.Arguments}");
-                            }
-
+                            case "TripPlannerPlugin":  // you need to remove the Async from the function name
+                                 if (functionCall.FunctionName == "SuggestPlaces")
+                                 {
+                                    // We have to use this approach as the FunctionCallContent.InvokeAsync() does not result a FunctionResult that can be streamed back to the client.
+                                    // In this example, the Suggest places is streaming back the whole response to the client in JSON format as a chunked response.  You could avoid this by using the JobID approach if this works for you.
+                                    // Otherwise you need to change the prompt in SuggestPlaces to only reponse with a small amount of data and then use a JobID to collect the rest of the data in the background. 
+                                    // You will need to use the JobID to check the status of the data collection and retrieve the data when ready.
+                                    // The JobID approach something can be consider for longer running tasks.  But, for this example we are streaming the whole response back to the client, which may not be the best approach for large data sets.
+                                    KernelFunction suggestPlacesFunction = _kernel.Plugins.GetFunction("TripPlannerPlugin", "SuggestPlaces");
+                                    KernelArguments suggestPlacesArgs = functionCall.Arguments!;
+                                    KernelArguments args = new() {
+                                        { "clientId", _clientId },
+                                        { "location", "Ashville, NC" },
+                                        { "categories", "Hiking and Biking" },
+                                        { "travelCompanions", "alone" },
+                                    };
+                                    FunctionResult result = await _kernel.InvokeAsync(suggestPlacesFunction, suggestPlacesArgs);
+                                    IAsyncEnumerable<string> datastream = result.GetValue<IAsyncEnumerable<string>>()!;
+                                    await foreach (var content in datastream)
+                                    {
+                                        await WriteChunk(writer, content);
+                                    }
+                                 }
+                                break;
+                            default:
+                                break;
                         }
                     }
                 }
