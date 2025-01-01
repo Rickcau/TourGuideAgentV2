@@ -1,3 +1,6 @@
+# LICENSE
+The [MIT License](./LICENSE) applies to all the solutions / projects / examples included in this repository.
+
 # TourGuideAgentv2
 This example is an ASP.NET MVC API that exposes an AI Chat Streaming endpoint.  It's demonstrating some very important concepts i.e. ChatHistoryManagerService, JobResultsCacheService, Plugins and Function Calling.
 
